@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from typing import List
-from src.db.database import Base
+from .database import Base
 from datetime import datetime
 
 class User(Base): # пользователь
@@ -31,7 +31,7 @@ class Entrepreneur(Base): # предприниматель
                                                               lazy="selectin"
                                                             ) # ссылаемся на таблицу с записями
     services: Mapped[List["Service"]] = relationship(
-                                                      back_populates="entrepreneurs",
+                                                      back_populates="entrepreneur",
                                                       cascade="all, delete-orphan",
                                                       lazy="selectin"
                                                     )
@@ -50,7 +50,11 @@ class Service(Base): # услуга
                                                           back_populates="services",
                                                           lazy="selectin"
                                                         )
-    appointment_id: Mapped[int] = mapped_column(ForeignKey("appointments.id"))
+    appointments: Mapped[List["Appointment"]] = relationship(
+                                                               back_populates="service",
+                                                               cascade="all, delete-orphan",
+                                                               lazy="selectin"
+                                                             )
 
 class Appointment(Base): # запись 
     __tablename__ = "appointments"
@@ -61,7 +65,7 @@ class Appointment(Base): # запись
     address: Mapped[str] = mapped_column(String(100))
     service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id")) # сохраняем какую услугу оказываем, чтобы service могла сослаться на таблицу
     service: Mapped["Service"] = relationship(
-                                               backref="appointments",
+                                               back_populates="appointments",
                                                lazy="selectin"
                                             )
     entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("entrepreneurs.id")) # id исполнителя

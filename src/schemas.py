@@ -3,7 +3,6 @@ from pydantic.functional_validators import BeforeValidator
 from datetime import datetime
 from typing import Annotated
 
-#! TODO: переделать валидацию под изменившиеся поля в бд
 
 # проверяем номер телефона
 def validate_phone(value: str) -> str:
@@ -39,14 +38,24 @@ class UserResponse(UserCreate):
     class Config:
         from_attributes = True
         
+class EntrepreneurCreate(BaseModel):
+    full_name: str
+    phone: PhoneNumber
+    telegram_id: TgId
+
+class EntrepreneurResponse(EntrepreneurCreate):
+    id: int
+    
+    class Config:
+        from_attributes = True
+        
 """Услуга"""
 class ServiceCreate(BaseModel):
     name: str
     price: int
     description: str
     price_type: str
-    duration: int
-    entrepreneur_id: int
+    duration: str
     
     model_config = ConfigDict(extra='forbid')
 
@@ -59,7 +68,6 @@ class ServiceResponse(ServiceCreate):
 """Запись"""
 class AppointmentCreate(BaseModel):
     date: datetime
-    user_id: int
     comment: str
     address: str
     service_id: int
@@ -74,15 +82,5 @@ class AppointmentResponse(AppointmentCreate):
     class Config:
         from_attributes = True
         
-class EntrepreneurCreate(BaseModel):
-    full_name: str
-    phone: PhoneNumber
-    telegram_id: TgId
-
-class EntrepreneurResponse(EntrepreneurCreate):
-    id: int
-    
-    class Config:
-        from_attributes = True
     
         
