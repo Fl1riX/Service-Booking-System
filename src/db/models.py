@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy.orm import relationship, Mapped, mapped_column, validates
 from typing import List
 from .database import Base
 from datetime import datetime
+
+#! TODO дописать валидацию данных в бд
 
 class User(Base): # пользователь
     __tablename__ = "users"
@@ -18,6 +20,12 @@ class User(Base): # пользователь
                                                               lazy="selectin" # загружает все через два оптимизированных запроса, контролирует когда загружать связанные данные
                                                             ) # ссылаеся на записи 
 
+    @validates("created_at")
+    def validate_create_date(self, key, value):
+      #! не должна быть в будующем 
+      pass
+      
+
 class Entrepreneur(Base): # предприниматель
     __tablename__ = "entrepreneurs"
     
@@ -25,6 +33,7 @@ class Entrepreneur(Base): # предприниматель
     full_name: Mapped[str] = mapped_column(String(70), nullable=False)
     phone: Mapped[str] = mapped_column(String(25), unique=True, nullable=False, index=True)
     telegram_id: Mapped[int] = mapped_column(unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     appointments: Mapped[List["Appointment"]] = relationship(
                                                               back_populates="entrepreneur",
                                                               cascade="all, delete-orphan",
@@ -43,8 +52,8 @@ class Service(Base): # услуга
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     price: Mapped[int] = mapped_column(nullable=False)
     description: Mapped[str] = mapped_column(String(2000))
-    price_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    duration: Mapped[int] = mapped_column(nullable=False) # продолжительость в часах
+    duration: Mapped[str] = mapped_column(nullable=False) # продолжительость в часах
+    address: Mapped[str] = mapped_column(String(100))
     entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("entrepreneurs.id"))
     entrepreneur: Mapped["Entrepreneur"] = relationship(
                                                           back_populates="services",
@@ -62,8 +71,7 @@ class Appointment(Base): # запись
     id: Mapped[int] = mapped_column(primary_key=True)
     date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     comment: Mapped[str] = mapped_column(String(1200))
-    address: Mapped[str] = mapped_column(String(100))
-    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("services.id")) # сохраняем какую услугу оказываем, чтобы service могла сослаться на таблицу
+    service_id: Mapped[int] = mapped_column(ForeignKey("services.id")) # сохраняем какую услугу оказываем, чтобы service могла сослаться на таблицу
     service: Mapped["Service"] = relationship(
                                                back_populates="appointments",
                                                lazy="selectin"

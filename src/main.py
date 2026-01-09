@@ -3,9 +3,12 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.v1.endpoints import router
+from logger import logger
 
 app = FastAPI(title="Service Booking System", version="0.0.1", description="Система для бронирования услуг")
 app.include_router(router, prefix="/api/v1")
+
+#! TODO: сделать логирование
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,6 +20,7 @@ app.add_middleware(
 
 @app.get("/")
 def wellcome():
+    logger.info("Получен  запрос: GET /")
     return{
         "message": "Добро пожаловать в Service-Booking-System",
         "detail": "Документация http://localhost:8000/docs"

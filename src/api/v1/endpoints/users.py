@@ -15,7 +15,7 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
     )) 
     user = result.scalars().first() 
     if not user:
-        raise HTTPException(status_code=404, detail=f"Пользователь с id: {user_id} не найден")
+        raise HTTPException(status_code=404, detail=f"Пользователь не найден")
     return user
 
 @router.post("/", response_model=schemas.UserResponse)

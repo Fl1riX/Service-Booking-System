@@ -1,4 +1,4 @@
+from config import TOKEN
 
 
-
-token = "6534323844:AAFzNm-YE0oPUxsIpRr9ZHXr_rSF9WWCJx0"
+token = ""

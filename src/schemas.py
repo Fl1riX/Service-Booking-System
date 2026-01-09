@@ -3,7 +3,6 @@ from pydantic.functional_validators import BeforeValidator
 from datetime import datetime
 from typing import Annotated
 
-
 # проверяем номер телефона
 def validate_phone(value: str) -> str:
         if not value.startswith('+'):
@@ -54,8 +53,9 @@ class ServiceCreate(BaseModel):
     name: str
     price: int
     description: str
-    price_type: str
     duration: str
+    address: str
+    entrepreneur_id: int
     
     model_config = ConfigDict(extra='forbid')
 
@@ -69,7 +69,6 @@ class ServiceResponse(ServiceCreate):
 class AppointmentCreate(BaseModel):
     date: datetime
     comment: str
-    address: str
     service_id: int
     entrepreneur_id: int
     user_id: int
