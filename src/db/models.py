@@ -20,12 +20,14 @@ class User(Base): # пользователь
     my_appointments: Mapped[List["Appointment"]] = relationship(
                                                               back_populates="user",
                                                               cascade="all, delete-orphan", # каскадная операция, при удалении удалятся все связанные данные
-                                                              lazy="selectin" # загружает все через два оптимизированных запроса, контролирует когда загружать связанные данные
+                                                              lazy="selectin", # загружает все через два оптимизированных запроса, контролирует когда загружать связанные данные
+                                                              foreign_keys="[Appointment.user_id]"
                                                             ) # ссылаеся на записи 
     users_appointments: Mapped[List["Appointment"]] = relationship(
                                                               back_populates="entrepreneur",
                                                               cascade="all, delete-orphan",
-                                                              lazy="selectin"
+                                                              lazy="selectin",
+                                                              foreign_keys="[Appointment.entrepreneur_id]"
                                                             ) # ссылаемся на таблицу с записями
     services: Mapped[List["Service"]] = relationship(
                                                       back_populates="entrepreneur",

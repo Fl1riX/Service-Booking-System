@@ -8,6 +8,7 @@ from src.api.v1.endpoints import router as endpoints_router
 from src.api.v1.auth import router as auth_router
 from src.logger import logger
 from src.limiter import limiter
+from src.api.v1.auth.auth import router as auth_router
 
 
 app = FastAPI(
