@@ -20,6 +20,13 @@ class UserRegisterResponse(BaseModel):
     class Config:
         from_attributes = True
         
+class UserUpdate(BaseModel):
+    telegram_id: Optional[TgId] = None
+    username: Optional[str] = None
+    phone: Optional[PhoneNumber] = None
+    email: Optional[Email] = None
+    
+    model_config = ConfigDict(extra='forbid') # запрещаем не указанные поля
 class UserLogin(BaseModel):
     telegram_id: Optional[TgId] = None
     email: Optional[Email] = None
@@ -36,7 +43,7 @@ class UserLogin(BaseModel):
     
 class UserLoginResponse(BaseModel):
     id: int
-    token: str
+    access_token: str
     token_type: str
     
     class Config:
@@ -44,13 +51,13 @@ class UserLoginResponse(BaseModel):
         
 class UserResponse(BaseModel):
     id: int
-    telegram_id: TgId
+    telegram_id: TgId | None
     username: str
-    phone: PhoneNumber
+    phone: PhoneNumber | None
     email: Email 
     created_at: datetime
     is_entrepreneur: bool
-    full_name: str
+    full_name: str | None
     
     class Config:
         from_attributes = True

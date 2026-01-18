@@ -16,25 +16,27 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     который пытается получить доступ к защищенной ручке, 
     т.е достаем его из заголовков
     """
-    
+    logger.info(f"🔍 Получен токен: {token}...")
     payload = decode_token(token)
+    logger.info(f"Декодированный токен: {payload}")
 
     if not payload:
         logger.warning("Невалидный или истекший токен")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
-            headers={"WWW-Auntificate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
     
-    user_id = payload.get("user_id")
+    user_id = payload.get("sub")
 
+    
     if not user_id:
         logger.warning("В токене отсутствует user_id")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
-            headers={"WWW-Auntificate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
     return user_id
 
@@ -47,10 +49,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
-            headers={"WWW-Auntificate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
     
-    user_id = payload.get("user_id")
+    user_id = payload.get("sub")
     
     if not user_id:
         logger.warning("Токен не содержит user_id")

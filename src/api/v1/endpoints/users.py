@@ -38,12 +38,12 @@ async def get_user(
     logger.info(f"GET: Найден пользователь с id: {user_id} ✅")
     return user
 
-@router.put("/{user_id}", response_model=user_schema.UserResponse)
+@router.put("/{user_id}", response_model=user_schema.UserUpdate)
 @limiter.limit("5/minute")
 async def update_user(
     request: Request,
     user_id: int, 
-    new_user: user_schema.UserRegister, 
+    new_user: user_schema.UserUpdate, 
     current_user_id: int = Depends(get_current_user_id), 
     db: AsyncSession = Depends(get_db)
 ):

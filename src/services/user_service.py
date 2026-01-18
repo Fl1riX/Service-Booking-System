@@ -57,7 +57,7 @@ class UserService:
             raise
             
     @staticmethod
-    async def update_user(new_user: user_schema.UserRegister, db: AsyncSession, user: User):
+    async def update_user(new_user: user_schema.UserUpdate, db: AsyncSession, user: User):
         # построчно передираем словарь
         for key, value in new_user.dict().items(): # items построчно разбивает словрь на пары (ключ, значение)
             if hasattr(user, key) and value is not None: # если в user(в бд) есть такое поле

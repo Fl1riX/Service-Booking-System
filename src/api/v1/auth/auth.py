@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from fastapi.security import OAuth2PasswordRequestForm
 
 from src.api.v1.auth.jwt_handler import create_access_token, verify_password, hash_password
 from src.db.database import get_db
@@ -34,15 +35,19 @@ async def create_user(request: Request, user: user_schema.UserRegister, db: Asyn
     return {
             "user": new_user,
             "token": token,
-            "token_type": "bearer"
+            "token_type": "Bearer"
             }
     
 @router.post("/login", response_model=user_schema.UserLoginResponse)
 @limiter.limit("5/minute")
-async def login_user(request: Request, user: user_schema.UserLogin, db: AsyncSession = Depends(get_db)):
-    logger.info("Получен запрос: GET /auth/register")
+async def login_user(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    logger.info("Получен запрос: GET /auth/login")
     logger.info("POST: Проверка наличия пользователя в бд...")
-    user_exists = await UserService.check_user_exists(user=user, db=db)
+    user_data = user_schema.UserLogin(
+        email=form_data.username,
+        password=form_data.password
+    )
+    user_exists = await UserService.check_user_exists(user=user_data, db=db)
     
     # проверяем регистрацию пользователя
     if not user_exists:
@@ -50,15 +55,15 @@ async def login_user(request: Request, user: user_schema.UserLogin, db: AsyncSes
         raise HTTPException(status_code=404, detail="Неверный email или пароль")
     
     # проверяем корректность введенного пароля
-    if not verify_password(password=user.password, hashed_password=user_exists.password):
-        logger.info(f"Введен не верный пароль пользователя: {user.email}")
+    if not verify_password(password=form_data.password, hashed_password=user_exists.password):
+        logger.info(f"Введен не верный пароль пользователя: {user_data.email}")
         raise HTTPException(status_code=404, detail="Неверный email или пароль")  
     
     token = create_access_token({"sub": user_exists.id})
     
     return {
         "id": user_exists.id,
-        "token": token,
-        "token_type": "bearer"
+        "access_token": token,
+        "token_type": "Bearer"
     }
     

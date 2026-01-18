@@ -12,15 +12,22 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    """Проверяем  пароль"""
+    """Проверяем пароль"""
     return pwd_context.verify(password, hashed_password)
 
 def create_access_token(data: dict) -> str:
     """Создаем JWT токен"""
+    logger.info("Создание JWT токена...")
     to_encode = data.copy() # копируем данные, чтобы не менять исходный словарь
-    expire = datetime.utcnow() + timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES)) # через сколько токен становится не действительным 
-    to_encode.update({"exp": expire}) # добавляем чремя через которе истечет действие токена
-    to_encode.update({"iat": datetime.utcnow()}) # когда выдан
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES) # через сколько токен становится не действительным 
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.utcnow()
+    }) # добавляем чремя через которе истечет действие токена
+    logger.debug(f"Кодирование информации в токен: {to_encode}...")
+    
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
     
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM) # кодируем данные в токен
     logger.info(f"JWT токен создан для user_id={data.get('sub')}")
@@ -29,6 +36,7 @@ def create_access_token(data: dict) -> str:
 def decode_token(token: str) -> dict | None:
     """Декодировать JWT токен"""
     try:
+        logger.info("Декодирование токена...")
         payload = jwt.decode(token, 
                              SECRET_KEY, 
                              algorithms=[ALGORITHM], 
@@ -37,20 +45,24 @@ def decode_token(token: str) -> dict | None:
                                  "verify_signature": True  # проверяем подпись
                              }
                             ) # декодируем токен
+        logger.debug(f"Декодированная информация: {payload}")
         sub_value = payload.get("sub") # извлекаем данные о пользователе "sub" = subject
+        if sub_value:
+            sub_value = int(sub_value)
         
         if sub_value is None or not isinstance(sub_value, int):
             logger.error("Неверный субъект")
             return None
         
         user_id: int = sub_value
+        logger.info(f"Полученный user_id: {user_id}")
         
         # проверяем что пользователь существует
         if user_id is None:
             logger.warning("Токен без user_id")
             return None
         
-        return {"user_id": user_id}
-    except JWTError:
-        logger.warning("Невалидный токен")
+        return {"sub": user_id}
+    except JWTError as e:
+        logger.warning(f"Невалидный токен: {e}")
         return None
