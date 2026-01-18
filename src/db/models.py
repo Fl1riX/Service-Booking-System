@@ -5,8 +5,6 @@ from .database import Base
 from datetime import datetime
 from src.logger import logger
 
-#! TODO дописать валидацию данных в бд
-
 class User(Base): # пользователь
     __tablename__ = "users"
 
@@ -15,35 +13,16 @@ class User(Base): # пользователь
     username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     phone: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    password: Mapped[str] = mapped_column(String(50))
+    password: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    appointments: Mapped[List["Appointment"]] = relationship(
+    is_entrepreneur: Mapped[bool] = mapped_column(default=False)
+    full_name: Mapped[str | None] = mapped_column(String(150))
+    my_appointments: Mapped[List["Appointment"]] = relationship(
                                                               back_populates="user",
                                                               cascade="all, delete-orphan", # каскадная операция, при удалении удалятся все связанные данные
                                                               lazy="selectin" # загружает все через два оптимизированных запроса, контролирует когда загружать связанные данные
                                                             ) # ссылаеся на записи 
-
-    @validates("created_at")
-    def validate_create_date(self, key, value):
-      if not isinstance(value, datetime) and value is not None:
-        logger.warning("Некорректная дата")
-        raise TypeError("Некорректная дата")
-      elif value > datetime.utcnow():
-        logger.warning("Дата регистрации не может быть в будущем")
-        raise ValueError("Дата регистрации не может быть в будущем")
-      return value
-
-class Entrepreneur(Base): # предприниматель
-    __tablename__ = "entrepreneurs"
-    
-    id: Mapped[int] = mapped_column(primary_key=True)
-    full_name: Mapped[str] = mapped_column(String(70), nullable=False)
-    phone: Mapped[str] = mapped_column(String(25), unique=True, nullable=False, index=True)
-    password: Mapped[str] = mapped_column(String(50))
-    telegram_id: Mapped[int] = mapped_column(unique=True, index=True)
-    email: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    appointments: Mapped[List["Appointment"]] = relationship(
+    users_appointments: Mapped[List["Appointment"]] = relationship(
                                                               back_populates="entrepreneur",
                                                               cascade="all, delete-orphan",
                                                               lazy="selectin"
@@ -53,6 +32,11 @@ class Entrepreneur(Base): # предприниматель
                                                       cascade="all, delete-orphan",
                                                       lazy="selectin"
                                                     )
+    @validates("is_entrepreneur")
+    def validate_is_entrepreneur(self, key, value):
+      if value ==  True and not self.full_name:
+        raise ValueError("Предприниматель обязан заполнить свое имя")
+
     @validates("created_at")
     def validate_create_date(self, key, value):
       if not isinstance(value, datetime) and value is not None:
@@ -62,7 +46,7 @@ class Entrepreneur(Base): # предприниматель
         logger.warning("Дата регистрации не может быть в будущем")
         raise ValueError("Дата регистрации не может быть в будущем")
       return value
-
+    
 class Service(Base): # услуга
     __tablename__ = "services"
     __table_args__ = (
@@ -70,18 +54,18 @@ class Service(Base): # услуга
         "name",
         "address",
         "entrepreneur_id",
-        name="uq_name_adress_entrepreneur_id",
+        name="uq_name_address_entrepreneur_id",
       ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     price: Mapped[int] = mapped_column(nullable=False)
     description: Mapped[str] = mapped_column(String(2000))
     duration: Mapped[str] = mapped_column(String(10), nullable=False) # продолжительость в часах
     address: Mapped[str] = mapped_column(String(100))
-    entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("entrepreneurs.id"))
-    entrepreneur: Mapped["Entrepreneur"] = relationship(
+    entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    entrepreneur: Mapped["User"] = relationship(
                                                           back_populates="services",
                                                           lazy="selectin"
                                                         )
@@ -112,15 +96,17 @@ class Appointment(Base): # запись
                                                back_populates="appointments",
                                                lazy="selectin"
                                             )
-    entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("entrepreneurs.id")) # id исполнителя
-    entrepreneur: Mapped["Entrepreneur"] = relationship(
-                                                         back_populates="appointments",
-                                                         lazy="selectin"
+    entrepreneur_id: Mapped[int] = mapped_column(ForeignKey("users.id")) # id исполнителя
+    entrepreneur: Mapped["User"] = relationship(
+                                                         back_populates="users_appointments",
+                                                         lazy="selectin",
+                                                         foreign_key=[entrepreneur_id] # явно указываем внешний ключ, чтобы небыло ошибок
                                                        ) # ссылаемся на предринимателя
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     user: Mapped["User"] = relationship(
-                                         back_populates="appointments",
-                                         lazy="selectin"
+                                         back_populates="my_appointments",
+                                         lazy="selectin",
+                                         foreign_keys=[user_id]
                                        ) # ссылаемся на пользователя
     
     @validates("date")

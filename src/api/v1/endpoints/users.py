@@ -1,17 +1,30 @@
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException, status
+
 from src.schemas import user_schema
 from src.logger import logger
 from src.db.database import get_db
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException
+from src.api.v1.auth.dependencies import get_current_user_id
 from src.services.user_service import UserService
+from src.main import limiter
+
 
 router = APIRouter(prefix="/users", tags=["Пользователи"])
 
-@router.get("/{user_id}", response_model=user_schema.UserResponse)
-async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
+@router.get("/{user_id}",  response_model=user_schema.UserResponse)
+@limiter.limit("5/minute")
+async def get_user(user_id: int, current_user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     logger.info(f"GET: Получен запрос: GET /users/{user_id}")
-    logger.info(f"GET: Проверка наличия пользователя с id: {user_id} в бд...")
     
+    logger.info("Аутентификация пользователя")
+    if user_id != current_user_id:
+        logger.warning(f"user_id: {current_user_id} пытается получить данные чужого аккаунта: {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому аккаунту"
+        )
+    
+    logger.info(f"GET: Проверка наличия пользователя с id: {user_id} в бд...")
     user = await UserService.find_user_by_id(id=user_id, db=db)
     
     if not user:
@@ -22,10 +35,19 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
     return user
 
 @router.put("/{user_id}", response_model=user_schema.UserResponse)
-async def update_user(user_id: int, new_user: user_schema.UserRegister, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def update_user(user_id: int, new_user: user_schema.UserRegister, current_user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     logger.info(f"PUT: Получен запрос: PUT /users/{user_id}")
-    logger.info(f"PUT: Проверка наличия пользователя с id: {user_id} в бд...")
     
+    logger.info("Аутентификация пользователя")
+    if user_id != current_user_id:
+        logger.warning(f"user_id: {current_user_id} пытается изменить дынные чужого аккаунта: {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому аккаунту"
+        )
+    
+    logger.info(f"PUT: Проверка наличия пользователя с id: {user_id} в бд...")   
     user = await UserService.find_user_by_id(id=user_id, db=db)
     
     if not user:
@@ -39,10 +61,19 @@ async def update_user(user_id: int, new_user: user_schema.UserRegister, db: Asyn
     return user
 
 @router.delete("/{user_id}")
-async def delet_user(user_id: int, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def delet_user(user_id: int, current_user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     logger.info(f"DELETE: Получен запрос: DELETE /users/{user_id}")
-    logger.info(f"DELETE: Проверка наличия пользователя с id: {user_id} в бд...")
     
+    logger.info("Аутентификация пользователя")
+    if user_id != current_user_id:
+        logger.warning(f"user_id: {current_user_id} пытается удалить чужой аккаунт: {user_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="У вас нет доступа к этому аккаунту"
+        )
+    
+    logger.info(f"DELETE: Проверка наличия пользователя с id: {user_id} в бд...")
     user = await UserService.find_user_by_id(id=user_id, db=db)
     
     if not user:
@@ -50,8 +81,7 @@ async def delet_user(user_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Такого пользователя не существует")
     
     logger.info(f"DELETE: Пользователь с id: {user_id} найден в бд. Удаляем данные...")
-    
-    await UserService.delte_user(db=db, user=user)
+    await UserService.delete_user(db=db, user=user)
     
     return {"succes": True}
     

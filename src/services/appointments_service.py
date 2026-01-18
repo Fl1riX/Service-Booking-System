@@ -1,6 +1,7 @@
-from src import schemas
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.schemas import appointment_schema
 from src.db.models import Appointment
 from src.logger import logger
 
@@ -15,13 +16,13 @@ class AppointmentService:
         return appointment
     
     @staticmethod 
-    async def find_appointment(db: AsyncSession, appointment: schemas.AppointmentCreate):
+    async def find_appointment(appointment: appointment_schema.AppointmentCreate, db: AsyncSession, current_user_id: int):
         result = await db.execute(select(Appointment).where(
                 and_(
                     Appointment.date == appointment.date,
                     Appointment.service_id == appointment.service_id,
                     Appointment.entrepreneur_id == appointment.entrepreneur_id,
-                    Appointment.user_id == appointment.user_id
+                    Appointment.user_id == current_user_id
                 )
             )
         )
@@ -31,9 +32,13 @@ class AppointmentService:
         return existing
     
     @staticmethod
-    async def create_appointment(db: AsyncSession, appointment:schemas.AppointmentCreate): 
+    async def create_appointment(appointment:appointment_schema.AppointmentCreate, current_user_id: int, db: AsyncSession): 
         logger.info("POST: Запись не найдена в бд ✅. Добавление информации...")
-        new_appointment = Appointment(**appointment.dict())
+        
+        appointment_data = Appointment(**appointment.dict())
+        appointment_data["user_id"] = current_user_id
+        
+        new_appointment = Appointment(**appointment_data)
 
         try:
             db.add(new_appointment)
@@ -47,7 +52,7 @@ class AppointmentService:
         return new_appointment
     
     @staticmethod 
-    async def update_appointment(db: AsyncSession, appointment_id: int, new_appointment: schemas.AppointmentCreate, appointment: Appointment):
+    async def update_appointment(db: AsyncSession, appointment_id: int, new_appointment: appointment_schema.AppointmentCreate, appointment: Appointment):
         logger.info(f"PUT: Запись с id: {appointment_id} успешно найдена в бд ✅. Обновление данных...")
         for key, value in new_appointment.dict().items():
             if hasattr(appointment, key) and value is not None:

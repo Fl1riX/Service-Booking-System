@@ -1,12 +1,15 @@
-from src import schemas
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.schemas import service_schema
 from src.db.models import Service
 from src.logger import logger
+from src.services.user_service import UserService
 
 class ServiceService:
     @staticmethod
     async def find_service_by_id(id: int, db: AsyncSession):
+        """Поиск улуги по id"""
         result = await db.execute(select(Service).where(
             Service.id == id
         ))
@@ -15,11 +18,18 @@ class ServiceService:
         return service
     
     @staticmethod
-    async def find_by_name(service: schemas.ServiceCreate, db: AsyncSession):
+    async def find_by_name(
+        name: str, 
+        address: str,
+        current_user_id: int, 
+        db: AsyncSession
+    ) -> Service | None:
+        """Ищет услугу по имени, адресу и id предпринимателя """
         result = await db.execute(select(Service).where(
             and_(
-                Service.name == service.name,
-                Service.entrepreneur_id == service.entrepreneur_id
+                Service.name == name,
+                Service.address == address,
+                Service.entrepreneur_id == current_user_id
             )
         ))
         existing = result.scalars().first()
@@ -27,8 +37,24 @@ class ServiceService:
         return existing
 
     @staticmethod
-    async def create_service(service: schemas.ServiceCreate, db: AsyncSession):
-        new_service = Service(**service.dict())
+    async def create_service(service: service_schema.ServiceCreate, current_user_id: int, db: AsyncSession):
+        """Создает новую услугу"""
+        user = await UserService.find_user_by_id(current_user_id, db=db)
+        if not user:
+            logger.info(f"Пользователь с id: {current_user_id} не найден")
+            raise ValueError(f"Пользователь с id: {current_user_id} не найден")
+        
+        if not user.full_name:
+            raise ValueError("У пользователя не указано полное имя")
+        
+        if not user.is_entrepreneur:
+            user.is_entrepreneur = True
+            await db.flush() # сохранение изменения флага 
+        
+        service_data = Service(**service.dict())
+        service_data["entrepreneur_id"] = current_user_id
+        
+        new_service = Service(**service_data)
     
         try:
             db.add(new_service)
@@ -45,6 +71,7 @@ class ServiceService:
     
     @staticmethod
     async def delete_service(service: Service, db: AsyncSession):
+        """Удаляет услугу"""     
         logger.info("DELETE: Услуга найдена ✅. Удаление...")
         try:
             await db.delete(service)
@@ -57,7 +84,8 @@ class ServiceService:
             raise
     
     @staticmethod 
-    async def update_service(db: AsyncSession, new_service: schemas.ServiceCreate, service: Service):
+    async def update_service(db: AsyncSession, new_service: service_schema.ServiceCreate, service: Service):
+        """Обновляет данные об услуге"""
         for key, value in new_service.dict().items():
             if hasattr(service, key) and value is not None:
                 setattr(service, key, value)

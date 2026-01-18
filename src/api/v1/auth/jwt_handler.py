@@ -18,7 +18,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict) -> str:
     """Создаем JWT токен"""
     to_encode = data.copy() # копируем данные, чтобы не менять исходный словарь
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES) # через сколько токен становится не действительным 
+    expire = datetime.utcnow() + timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES)) # через сколько токен становится не действительным 
     to_encode.update({"exp": expire}) # добавляем чремя через которе истечет действие токена
     to_encode.update({"iat": datetime.utcnow()}) # когда выдан
     
@@ -39,7 +39,7 @@ def decode_token(token: str) -> dict | None:
                             ) # декодируем токен
         sub_value = payload.get("sub") # извлекаем данные о пользователе "sub" = subject
         
-        if sub_value is None or isinstance(sub_value, int):
+        if sub_value is None or not isinstance(sub_value, int):
             logger.error("Неверный субъект")
             return None
         

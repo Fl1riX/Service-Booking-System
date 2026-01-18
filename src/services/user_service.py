@@ -1,4 +1,4 @@
-from src import schemas
+from src.schemas import user_schema
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import User
@@ -6,7 +6,7 @@ from src.logger import logger
 
 class UserService:
     @staticmethod
-    async def check_user_exists(user: schemas.UserCreate | schemas.UserLogin, db: AsyncSession):
+    async def check_user_exists(user: user_schema.UserRegister | user_schema.UserLogin, db: AsyncSession):
         """Проверяем существование польщователя по id в telegram, email или номеру телефона"""
         result = await db.execute(select(User).where(
             or_(
@@ -45,7 +45,7 @@ class UserService:
         return user
     
     @staticmethod
-    async def delte_user(db: AsyncSession, user: User):
+    async def delete_user(db: AsyncSession, user: User):
         try:
             await db.delete(user)
             await db.commit()
@@ -57,7 +57,7 @@ class UserService:
             raise
             
     @staticmethod
-    async def update_user(new_user: schemas.UserCreate, db: AsyncSession, user: User):
+    async def update_user(new_user: user_schema.UserRegister, db: AsyncSession, user: User):
         # построчно передираем словарь
         for key, value in new_user.dict().items(): # items построчно разбивает словрь на пары (ключ, значение)
             if hasattr(user, key) and value is not None: # если в user(в бд) есть такое поле
