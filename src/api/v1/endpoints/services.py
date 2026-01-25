@@ -37,7 +37,14 @@ async def create_service(
     current_user_id: int = Depends(get_current_user_id), 
     db: AsyncSession = Depends(get_db)
 ):
-    logger.info(f"Получен запрос: POST /services/")
+    logger.info("Получен запрос: POST /services/")
+    
+    if current_user_id != service.entrepreneur_id:
+        logger.warning(f"Пользователь с id: {current_user_id} пытается поздать услугу пользователю с id: {service.entrepreneur_id}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Вы не можете создать услугу другому пользователю"
+        )
     
     logger.info("POST: Проверка наличия услуги в бд...")
     existing = await ServiceService.find_by_name(name=service.name, address=service.address, current_user_id=current_user_id, db=db)
@@ -65,7 +72,7 @@ async def delete_service(
     service = await ServiceService.find_service_by_id(id=service_id, db=db)
     
     if not service:
-        logger.error(f"DELETE: Такой услуги не существует в бд")
+        logger.error("DELETE: Такой услуги не существует в бд")
         raise HTTPException(status_code=404, detail="Такой услуги не существует")
     
     if service.entrepreneur_id != current_user_id:

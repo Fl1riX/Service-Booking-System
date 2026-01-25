@@ -2,19 +2,19 @@ from sqlalchemy import String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship, Mapped, mapped_column, validates
 from typing import List
 from .database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 from src.logger import logger
 
 class User(Base): # пользователь
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(unique=True, index=True) # для поиска использует B-дерево, что ускоряет его
+    telegram_id: Mapped[str] = mapped_column(String(25), unique=True, index=True) # для поиска использует B-дерево, что ускоряет его
     username: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     phone: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc))
     is_entrepreneur: Mapped[bool] = mapped_column(default=False)
     full_name: Mapped[str | None] = mapped_column(String(150))
     my_appointments: Mapped[List["Appointment"]] = relationship(
@@ -34,10 +34,6 @@ class User(Base): # пользователь
                                                       cascade="all, delete-orphan",
                                                       lazy="selectin"
                                                     )
-    @validates("is_entrepreneur")
-    def validate_is_entrepreneur(self, key, value):
-      if value ==  True and not self.full_name:
-        raise ValueError("Предприниматель обязан заполнить свое имя")
 
     @validates("created_at")
     def validate_create_date(self, key, value):

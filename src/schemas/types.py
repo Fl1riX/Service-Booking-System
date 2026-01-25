@@ -1,3 +1,5 @@
+import re
+
 from pydantic.functional_validators import BeforeValidator
 from typing import Annotated
 
@@ -13,14 +15,21 @@ def validate_phone(value: str) -> str:
 
 PhoneNumber = Annotated[str, BeforeValidator(validate_phone)] # создаем новый тип, где берем строку и проверяем ее перед испоьзованием
 
-def validate_tg_id(value: int) -> int:
+def validate_tg_id(value: int | str) -> str:
+    if isinstance(value, int):
+        value = str(value)
+        
+    if not value.isdigit():
+        raise ValueError("Telegram Id должен содержать только цифры")
+    
     if len(str(value)) < 9 or len(str(value)) > 12:
         raise ValueError("Неверная длинна id в telegram")
-    if value < 0:
+    
+    if int(value) < 0:
         raise ValueError("id аккаунта в telegram не может быть отрицательным")
-    return value
+    return str(value)
 
-TgId = Annotated[int, BeforeValidator(validate_tg_id)]
+TgId = Annotated[str, BeforeValidator(validate_tg_id)]
 
 def validate_email(value: str) -> str:
     if len(value) < 5:
@@ -33,3 +42,18 @@ def validate_email(value: str) -> str:
     return value
 
 Email = Annotated[str, BeforeValidator(validate_email)]
+
+def validate_login(login: str) -> str:
+    """Валидирует login, принимая email, телефон или telegram_id"""
+    if re.match(r"^\+[0-9]{11,16}$", login):
+        return login
+    if login.isdigit():
+        tg_id = validate_tg_id(login)
+        return str(tg_id)
+    if '@' in login and re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$",  login):
+        email = validate_email(login)
+        return email
+    
+    raise ValueError("Login должен быть email, номером телефона (+...) или Telegram ID")
+
+Login = Annotated[str, BeforeValidator(validate_login)]

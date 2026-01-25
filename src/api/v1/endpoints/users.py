@@ -33,7 +33,7 @@ async def get_user(
     
     if not user:
         logger.error(f"GET: Пользователь с id: {user_id} не найден")
-        raise HTTPException(status_code=404, detail=f"Пользователь не найден")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     logger.info(f"GET: Найден пользователь с id: {user_id} ✅")
     return user

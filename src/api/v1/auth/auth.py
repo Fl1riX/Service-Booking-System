@@ -1,5 +1,5 @@
 from src.schemas import user_schema
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -9,6 +9,8 @@ from src.api.v1.auth.jwt_handler import create_access_token, verify_password, ha
 from src.db.database import get_db
 from src.services.user_service import UserService
 from src.logger import logger
+from src.services.exceptions import UserNotFound
+from src.api.v1.auth.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/auth", tags=["Авторизация"])
 limiter = Limiter(key_func=get_remote_address)
@@ -19,13 +21,13 @@ async def create_user(request: Request, user: user_schema.UserRegister, db: Asyn
     logger.info("Получен запрос: POST /auth/register")
     logger.info("POST: Проверка наличия пользователя в бд...")
     
-    if await UserService.check_user_exists(user=user, db=db):
-        logger.error(f"POST: Такой пользователь уже существует в бд")
-        raise HTTPException(status_code=400, detail="Такой пользователь уже существует")
+    if await UserService.find_user_registration(user=user, db=db):
+        logger.error("POST: Такой пользователь уже существует в бд")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Такой пользователь уже существует")
     
     logger.info("POST: Такой пользователь не найден ✅. Запись данных  в бд...")
     hashed_password = hash_password(user.password)
-    user_dict = user.dict()
+    user_dict = user.model_dump(exclude_unset=True)
     user_dict["password"] = hashed_password
     
     new_user = await UserService.create_user(user=user_dict, db=db) # вносим данные пользователя в базу данных
@@ -41,23 +43,24 @@ async def create_user(request: Request, user: user_schema.UserRegister, db: Asyn
 @router.post("/login", response_model=user_schema.UserLoginResponse)
 @limiter.limit("5/minute")
 async def login_user(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    logger.info("Получен запрос: GET /auth/login")
+    logger.info("Получен запрос: POST /auth/login")
     logger.info("POST: Проверка наличия пользователя в бд...")
+    
     user_data = user_schema.UserLogin(
-        email=form_data.username,
+        login=form_data.username,
         password=form_data.password
     )
     user_exists = await UserService.check_user_exists(user=user_data, db=db)
     
     # проверяем регистрацию пользователя
     if not user_exists:
-        logger.error(f"POST: Такой пользователь не существует в бд")
-        raise HTTPException(status_code=404, detail="Неверный email или пароль")
+        logger.error("POST: Такой пользователь не существует в бд")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный email или пароль")
     
     # проверяем корректность введенного пароля
     if not verify_password(password=form_data.password, hashed_password=user_exists.password):
-        logger.info(f"Введен не верный пароль пользователя: {user_data.email}")
-        raise HTTPException(status_code=404, detail="Неверный email или пароль")  
+        logger.info(f"Введен не верный пароль для пользователя: {user_data.login}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный email или пароль")  
     
     token = create_access_token({"sub": user_exists.id})
     
@@ -66,4 +69,50 @@ async def login_user(request: Request, form_data: OAuth2PasswordRequestForm = De
         "access_token": token,
         "token_type": "Bearer"
     }
-    
+
+@router.post("/change_password")
+@limiter.limit("5/minute")
+async def change_password(
+    request: Request,
+    user_data: user_schema.ChangePassword, 
+    current_user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        logger.info("Получен новый запрос: POST /auth/change_password")
+        logger.info("Проверка существования пользователя в бд...")
+        user = await UserService.check_user_exists(user=user_data, db=db)
+        
+        if not user:
+            logger.warning(f"Пользователь: {user} не найден")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Пользователь не найден"
+            )
+        
+        logger.debug(f"Текущий пароль: {user.password}. Пароль от пользователя: {hash_password(user_data.current_password)}")
+        if not verify_password(password=user_data.current_password, hashed_password=user.password):
+            logger.warning(f"Неудачная попытка смены пароля пользователю: {user.id}. Текущий пароль не верный.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Отказано в доступе, введен неверный пароль"
+            )
+        
+        logger.info("Аутентификация пользователя...")
+        if current_user_id != user.id:
+            logger.warning(f"Пользователь: {current_user_id} пытается сменить пароль пользователя: {user.id}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="У вас нет доступа к этому аккаунту"
+            )
+        
+        logger.info("Обновление пароля пользователя...")
+        await UserService.update_user_password(db=db, user_data=user_data)
+        logger.info("Пароль успешно обновлен ✅")
+        
+        return {"success" : True}
+    except UserNotFound:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден"
+    )

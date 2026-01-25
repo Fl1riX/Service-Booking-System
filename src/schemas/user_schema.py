@@ -1,6 +1,6 @@
-from pydantic import BaseModel, ConfigDict, model_validator, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional
-from .types import TgId, Email, PhoneNumber
+from .types import TgId, Email, PhoneNumber, Login
 from datetime import datetime
 
 class UserRegister(BaseModel):
@@ -9,11 +9,27 @@ class UserRegister(BaseModel):
     phone: PhoneNumber | None
     email: Email 
     password: str = Field(max_length=255, min_length=8)
+    is_entrepreneur: bool = False
+    full_name: Optional[str] = None
     
     model_config = ConfigDict(extra='forbid') # запрещаем не указанные поля
+    
+    @model_validator(mode="after")
+    def validate_entrepreneur_name(self):
+        if self.is_entrepreneur and not self.full_name:
+            raise ValueError("Предприниматель обязан заполнить поле с именем")
+        return self
 
+class UserPublic(BaseModel):
+    telegram_id: TgId | None 
+    username: str = Field(max_length=50)
+    phone: PhoneNumber | None
+    email: Email 
+    
+    model_config = ConfigDict(extra='forbid')
+    
 class UserRegisterResponse(BaseModel):
-    user: UserRegister
+    user: UserPublic
     token: str
     token_type: str
     
@@ -27,19 +43,19 @@ class UserUpdate(BaseModel):
     email: Optional[Email] = None
     
     model_config = ConfigDict(extra='forbid') # запрещаем не указанные поля
+    
 class UserLogin(BaseModel):
-    telegram_id: Optional[TgId] = None
-    email: Optional[Email] = None
-    phone: Optional[PhoneNumber] = None
+    login: Login = Field(max_length=50, min_length=10)
     password: str = Field(max_length=255, min_length=8)
     
     model_config = ConfigDict(extra='forbid')
     
-    @model_validator(mode="after")
-    def validate_fields_not_none(self):
-        if self.telegram_id == None and self.email == None and self.phone == None:
-            raise ValueError("Нет данных для логина")
-        return self
+class ChangePassword(BaseModel):
+    login: Login = Field(max_length=50, min_length=10)
+    new_password: str = Field(max_length=255, min_length=8)
+    current_password: str = Field(max_length=255, min_length=8)
+    
+    model_config = ConfigDict(extra='forbid')
     
 class UserLoginResponse(BaseModel):
     id: int

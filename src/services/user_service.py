@@ -3,11 +3,13 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import User
 from src.logger import logger
+from src.api.v1.auth.jwt_handler import hash_password
+from src.services.exceptions import UserNotFound
 
 class UserService:
     @staticmethod
-    async def check_user_exists(user: user_schema.UserRegister | user_schema.UserLogin, db: AsyncSession):
-        """Проверяем существование польщователя по id в telegram, email или номеру телефона"""
+    async def find_user_registration(user: user_schema.UserRegister, db: AsyncSession):
+        """Проверяем существование пользователя по id в telegram, email или номеру телефона"""
         result = await db.execute(select(User).where(
             or_(
                 User.telegram_id == user.telegram_id,
@@ -16,11 +18,26 @@ class UserService:
                 )
             )
         )
+        registred = result.scalars().first()
+        return registred
+    
+    @classmethod
+    async def check_user_exists(cls, user: user_schema.UserLogin | user_schema.ChangePassword, db: AsyncSession):
+        """Проверка существования пользователя при входе в аккаунт"""
+        result = await db.execute(select(User).where(
+            or_(
+                    User.email == user.login,
+                    User.telegram_id == user.login,
+                    User.phone == user.login
+                )   
+            )
+        )
         existing = result.scalars().first()
         return existing
     
     @staticmethod
     async def create_user(user: dict, db: AsyncSession):
+        """Создание нового пользователя"""
         new_user = User(**user)
         try:
             db.add(new_user)
@@ -37,6 +54,7 @@ class UserService:
     
     @staticmethod
     async def find_user_by_id(id: int, db: AsyncSession):
+        """Поиск пользователя по id"""
         result = await db.execute(select(User).where(
             User.id == id
         )) 
@@ -46,6 +64,7 @@ class UserService:
     
     @staticmethod
     async def delete_user(db: AsyncSession, user: User):
+        """Удаление пользователя"""
         try:
             await db.delete(user)
             await db.commit()
@@ -58,6 +77,7 @@ class UserService:
             
     @staticmethod
     async def update_user(new_user: user_schema.UserUpdate, db: AsyncSession, user: User):
+        """Обновление данных пользователя"""
         # построчно передираем словарь
         for key, value in new_user.dict().items(): # items построчно разбивает словрь на пары (ключ, значение)
             if hasattr(user, key) and value is not None: # если в user(в бд) есть такое поле
@@ -72,3 +92,14 @@ class UserService:
             await db.rollback()
             logger.error(f"PUT: ❌ Ошибка ❌: {e}")
             raise
+    
+    @classmethod
+    async def update_user_password(cls, user_data: user_schema.ChangePassword, db: AsyncSession):
+        """Обновление пароля пользователя"""
+        user = await cls.check_user_exists(user=user_data, db=db)
+        if not user:
+            logger.warning(f"Пользователь не зарегистрирован: {user_data.login}")
+            raise UserNotFound
+        user.password = hash_password(user_data.new_password)
+        
+        await db.commit()

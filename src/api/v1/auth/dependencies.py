@@ -1,7 +1,6 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from src.db.database import get_db
 from src.api.v1.auth.jwt_handler import decode_token
@@ -30,7 +29,6 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     
     user_id = payload.get("sub")
 
-    
     if not user_id:
         logger.warning("В токене отсутствует user_id")
         raise HTTPException(
@@ -59,7 +57,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
-            headers={"WWW-Auntificate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"}
         )
     
     user = await UserService.find_user_by_id(id=user_id, db=db)
